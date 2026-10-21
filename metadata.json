@@ -1,0 +1,6 @@
+{
+  "name": "Crazy Obby: Sky Sprint 2D",
+  "description": "A colorful, mobile-first 2D side-scrolling obstacle course game with 20 progressively harder levels across 4 worlds, featuring air dash, parachute glide, speed sneakers, moving platforms, rotating saws, lasers, and checkpoints.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
