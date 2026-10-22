@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Crazy Obby: Sky Sprint 2D</title>
+    <meta name="description" content="A colorful, mobile-first 2D side-scrolling obstacle course game with 20 progressively harder levels across 4 worlds, featuring air dash, parachute glide, speed sneakers, moving platforms, rotating saws, lasers, and checkpoints." />
+    <meta property="og:title" content="Crazy Obby: Sky Sprint 2D" />
+    <meta property="og:description" content="A colorful, mobile-first 2D side-scrolling obstacle course game with 20 progressively harder levels across 4 worlds, featuring air dash, parachute glide, speed sneakers, moving platforms, rotating saws, lasers, and checkpoints." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#38bdf8" />
+  </head>
+  <body class="overflow-hidden select-none bg-sky-900 touch-none">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

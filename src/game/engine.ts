@@ -12,6 +12,7 @@ import { CharacterController } from './character';
 import { CAMERA_CONFIG, COLORS } from './constants';
 import { buildLevel, LevelData } from './level';
 import { PhysicsEngine } from './physics';
+import { safeStorage } from '../utils/storage';
 
 export interface EngineCallbacks {
   onStatsChange: (stats: PlayerStats) => void;
@@ -71,11 +72,9 @@ export class GameEngine {
     this.container = container;
     this.callbacks = callbacks;
 
-    // Load best time from localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('crazy_obby_best_time');
-      if (saved) this.bestTime = parseFloat(saved);
-    }
+    // Load best time from safe storage
+    const saved = safeStorage.getItem('crazy_obby_best_time');
+    if (saved) this.bestTime = parseFloat(saved);
 
     // 1. Detect software WebGL
     this.isSoftwareGl = (() => {
@@ -163,9 +162,7 @@ export class GameEngine {
           // Check high score
           if (this.bestTime === null || this.elapsedTime < this.bestTime) {
             this.bestTime = this.elapsedTime;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('crazy_obby_best_time', this.bestTime.toFixed(2));
-            }
+            safeStorage.setItem('crazy_obby_best_time', this.bestTime.toFixed(2));
           }
           this.emitStats();
           this.callbacks.onStatusChange('victory');

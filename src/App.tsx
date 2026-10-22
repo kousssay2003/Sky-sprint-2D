@@ -16,6 +16,7 @@ import { PauseModal } from './components/PauseModal';
 import { VictoryModal } from './components/VictoryModal';
 import { LevelSelectModal } from './components/LevelSelectModal';
 import { getTotalLevels } from './game2d/level2d';
+import { youtubePlayables } from './utils/youtubePlayables';
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -106,6 +107,27 @@ export default function App() {
       engine.destroy();
       engineRef.current = null;
     };
+  }, []);
+
+  // YouTube Playables Lifecycle Integration (pause/resume & audio control)
+  useEffect(() => {
+    const cleanup = youtubePlayables.initLifecycle({
+      onPause: () => {
+        if (engineRef.current) {
+          engineRef.current.setStatus('paused');
+        }
+        soundManager.setSystemSuspended(true);
+      },
+      onResume: () => {
+        soundManager.setSystemSuspended(false);
+      },
+      onAudioChange: (isAudioEnabled) => {
+        soundManager.setSystemMuted(!isAudioEnabled);
+        setIsMuted(soundManager.isMuted());
+      },
+    });
+
+    return cleanup;
   }, []);
 
   const handleStartGame = () => {

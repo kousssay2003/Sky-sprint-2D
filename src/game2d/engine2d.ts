@@ -16,6 +16,8 @@ import {
 import { getLevel2D, getTotalLevels } from './level2d';
 import { PhysicsEngine2D } from './physics2d';
 import { Renderer2D } from './renderer2d';
+import { youtubePlayables } from '../utils/youtubePlayables';
+import { safeStorage } from '../utils/storage';
 
 export interface Engine2DCallbacks {
   onStatsChange: (stats: PlayerStats2D) => void;
@@ -73,24 +75,22 @@ export class GameEngine2D {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.callbacks = callbacks;
 
-    // Load progress from localStorage
-    if (typeof window !== 'undefined') {
-      const savedMax = localStorage.getItem('crazy_obby_max_level');
-      if (savedMax) this.maxUnlockedLevel = Math.max(1, parseInt(savedMax, 10));
+    // Load progress from safe storage
+    const savedMax = safeStorage.getItem('crazy_obby_max_level');
+    if (savedMax) this.maxUnlockedLevel = Math.max(1, parseInt(savedMax, 10));
 
-      const savedRecords = localStorage.getItem('crazy_obby_level_records');
-      if (savedRecords) {
-        try {
-          this.levelRecords = JSON.parse(savedRecords);
-        } catch {}
-      }
+    const savedRecords = safeStorage.getItem('crazy_obby_level_records');
+    if (savedRecords) {
+      try {
+        this.levelRecords = JSON.parse(savedRecords);
+      } catch {}
+    }
 
-      const lastPlayed = localStorage.getItem('crazy_obby_last_level');
-      if (lastPlayed) {
-        const lvl = parseInt(lastPlayed, 10);
-        if (lvl >= 1 && lvl <= getTotalLevels()) {
-          this.currentLevelNumber = lvl;
-        }
+    const lastPlayed = safeStorage.getItem('crazy_obby_last_level');
+    if (lastPlayed) {
+      const lvl = parseInt(lastPlayed, 10);
+      if (lvl >= 1 && lvl <= getTotalLevels()) {
+        this.currentLevelNumber = lvl;
       }
     }
 
@@ -150,10 +150,16 @@ export class GameEngine2D {
             this.maxUnlockedLevel = Math.max(this.maxUnlockedLevel, this.currentLevelNumber + 1);
           }
 
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('crazy_obby_max_level', String(this.maxUnlockedLevel));
-            localStorage.setItem('crazy_obby_level_records', JSON.stringify(this.levelRecords));
-          }
+          safeStorage.setItem('crazy_obby_max_level', String(this.maxUnlockedLevel));
+          safeStorage.setItem('crazy_obby_level_records', JSON.stringify(this.levelRecords));
+          // Mirror save to YouTube Playables Cloud Save
+          youtubePlayables.saveCloudData(
+            JSON.stringify({
+              maxUnlockedLevel: this.maxUnlockedLevel,
+              levelRecords: this.levelRecords,
+              lastPlayedLevel: this.currentLevelNumber,
+            })
+          ).catch(() => {});
 
           this.emitStats();
           this.callbacks.onLevelComplete(this.currentLevelNumber, stars);
@@ -172,19 +178,41 @@ export class GameEngine2D {
     this.setupEventListeners();
     this.emitStats();
 
+    // Check YouTube Playables Cloud Save
+    youtubePlayables.loadCloudData().then((cloudJson) => {
+      if (cloudJson) {
+        try {
+          const parsed = JSON.parse(cloudJson);
+          let changed = false;
+          if (typeof parsed.maxUnlockedLevel === 'number' && parsed.maxUnlockedLevel > this.maxUnlockedLevel) {
+            this.maxUnlockedLevel = parsed.maxUnlockedLevel;
+            changed = true;
+          }
+          if (parsed.levelRecords && typeof parsed.levelRecords === 'object') {
+            this.levelRecords = { ...this.levelRecords, ...parsed.levelRecords };
+            changed = true;
+          }
+          if (changed) {
+            this.emitStats();
+          }
+        } catch {}
+      }
+    }).catch(() => {});
+
     // Start loop
     this.isRunning = true;
     this.lastTime = performance.now();
     this.loop = this.loop.bind(this);
     this.animationFrameId = requestAnimationFrame(this.loop);
+
+    // Signal to YouTube Playables that the game is interactive and menu is ready
+    youtubePlayables.sendGameReady();
   }
 
   public loadLevel(levelNumber: number) {
     const validLevel = Math.max(1, Math.min(levelNumber, getTotalLevels()));
     this.currentLevelNumber = validLevel;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('crazy_obby_last_level', String(validLevel));
-    }
+    safeStorage.setItem('crazy_obby_last_level', String(validLevel));
 
     const newLevel = getLevel2D(validLevel);
     this.physics.loadLevel(newLevel);
@@ -397,6 +425,9 @@ export class GameEngine2D {
       this.height,
       timestamp * 0.001
     );
+
+    // Notify YouTube Playables on the very first frame rendered
+    youtubePlayables.sendFirstFrameReady();
 
     this.animationFrameId = requestAnimationFrame(this.loop);
   }

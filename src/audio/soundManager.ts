@@ -1,3 +1,5 @@
+import { safeStorage } from '../utils/storage';
+
 /**
  * Zero-dependency procedural Web Audio sound synthesizer for Crazy Obby.
  * Clean, punchy arcade audio without any external assets.
@@ -5,13 +7,21 @@
 
 class SoundManager {
   private ctx: AudioContext | null = null;
-  private muted: boolean = false;
+  private _userMuted: boolean = false;
+  private systemMuted: boolean = false;
+  private isSuspendedBySystem: boolean = false;
 
   constructor() {
-    // Check if muted in local storage
-    if (typeof window !== 'undefined') {
-      this.muted = localStorage.getItem('crazy_obby_muted') === 'true';
-    }
+    // Check if muted in local storage (safe in sandboxed iframes)
+    this._userMuted = safeStorage.getItem('crazy_obby_muted') === 'true';
+  }
+
+  public get muted(): boolean {
+    return this._userMuted || this.systemMuted || this.isSuspendedBySystem;
+  }
+
+  public set muted(val: boolean) {
+    this.setMuted(val);
   }
 
   private initCtx() {
@@ -21,7 +31,7 @@ class SoundManager {
         this.ctx = new AudioCtx();
       }
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (this.ctx && this.ctx.state === 'suspended' && !this.muted) {
       this.ctx.resume().catch(() => {});
     }
   }
@@ -30,16 +40,44 @@ class SoundManager {
     return this.muted;
   }
 
+  public isUserMuted(): boolean {
+    return this._userMuted;
+  }
+
   public setMuted(muted: boolean) {
-    this.muted = muted;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('crazy_obby_muted', String(muted));
-    }
+    this._userMuted = muted;
+    safeStorage.setItem('crazy_obby_muted', String(muted));
   }
 
   public toggleMute(): boolean {
-    this.setMuted(!this.muted);
-    return this.muted;
+    this.setMuted(!this._userMuted);
+    return this._userMuted;
+  }
+
+  /**
+   * Called by YouTube Playables when platform audio state changes
+   * (e.g. ytgame.system.onAudioEnabledChange)
+   */
+  public setSystemMuted(isMuted: boolean) {
+    this.systemMuted = isMuted;
+    if (isMuted && this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend().catch(() => {});
+    } else if (!this.muted && this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
+  /**
+   * Called by YouTube Playables when game is paused or resumed
+   * (ytgame.system.onPause / onResume)
+   */
+  public setSystemSuspended(suspended: boolean) {
+    this.isSuspendedBySystem = suspended;
+    if (suspended && this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend().catch(() => {});
+    } else if (!this.muted && this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
   }
 
   public playJump() {
